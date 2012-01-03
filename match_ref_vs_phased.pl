@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 if (@ARGV != 5) {
-	print "Usage: $0 <phased_file> <start> <stop> <refhap_linenum, starting from top>\n";
+	print "Usage: $0 <phased_file> <start_bp> <stop_bp> <refhap_file> <refhap_linenum, starting from top>\n";
 	exit;
 }
 
@@ -24,9 +24,10 @@ my $refhapline = $ARGV[4];
 my @refhap;
 my $maxmismatch = 3;
 
-open (FILE, "$refhapfile") or die "Cannot open $phasedfile file.\n";
-my ($start, $stop);
+open (FILE, "$refhapfile") or die "Cannot open $refhapfile file.\n";
+my ($start, $stop) = (0,0);
 my $head = <FILE>;
+$head =~ s/\s+$//;					# Remove line endings
 my @positions = split("\t", $head);
 shift(@positions);
 for (my $i=0; $i<=$#positions; $i++) {
@@ -35,12 +36,17 @@ for (my $i=0; $i<=$#positions; $i++) {
 		last;
 	}
 }
-for (my $i=0; $i<$#positions; $i++) {
-	if ($positions[$i+1] > $bpstop) {
+for (my $i=0; $i<=$#positions; $i++) {
+	if ($i == $#positions) {
+		$stop = $i;
+	} elsif ($positions[$i+1] > $bpstop) {
 		$stop = $i;
 		last;
 	}
 }
+
+
+
 my $linecount = 1;
 while ( <FILE> ) {
 	$_ =~ s/\s+$//;					# Remove line endings
@@ -60,16 +66,16 @@ close FILE;
 
 
 
-print "Findiv\tMax match\tnSNPs checked\tmaxmatch start\tmaxmatch end\n";
+print "subjectid\tMax match\tnSNPs checked\tmaxmatch start\tmaxmatch end\n";
 open (FILE, "$phasedfile") or die "Cannot open $phasedfile file.\n";
 $linecount = 0;
-my ($previnfo, $prevfindiv, $prev_max) = ((0)x3);
+my ($previnfo, $prevsubjectid, $prev_max) = ((0)x3);
 <FILE>;
 while ( <FILE> ) {
 	$_ =~ s/\s+$//;					# Remove line endings
 	$linecount++;
 	my @line = split ("\t", $_);
-	my $findiv = shift(@line);	
+	my $subjectid = shift(@line);	
 	my ($maxlength, $maxmatch_start, $maxmatch_end, $nzeros) = ((0)x4);
 	
 	for (my $offset=0; $offset<=$maxmismatch; $offset++) {
@@ -86,7 +92,6 @@ while ( <FILE> ) {
 				}
 				last;
 			}
-
 	 		if ($line[$i] eq $refhap[$i] || $refhap[$i] eq '0') {
 				$currlength += 1;
 				if ($inmatch == 0) {
@@ -118,18 +123,18 @@ while ( <FILE> ) {
 		}
 	}
 	
-	if ($prevfindiv == $findiv) {
+	if ($prevsubjectid == $subjectid) {
 		if ($prev_max > $maxlength) {
 			print "$previnfo\n";
 		} else {
-			print "$findiv\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
+			print "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
 		}
 	}
 	
-	# print "$findiv\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
+	# print "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
 	
-	$previnfo = "$findiv\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end";
-	$prevfindiv = $findiv;
+	$previnfo = "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end";
+	$prevsubjectid = $subjectid;
 	$prev_max = $maxlength;
 }
 close FILE;
