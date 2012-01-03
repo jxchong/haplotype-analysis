@@ -10,8 +10,8 @@
 use strict;
 use warnings;
 
-if (@ARGV != 5) {
-	print "Usage: $0 <phased_file> <start_bp> <stop_bp> <refhap_file> <refhap_linenum, starting from top>\n";
+if (@ARGV != 6) {
+	print "Usage: $0 <phased_file> <start_bp> <stop_bp> <refhap_file> <refhap_linenum, starting from top> <pos required to be in match>\n";
 	exit;
 }
 
@@ -21,47 +21,47 @@ $bpstart =~ s/,//g;
 $bpstop =~ s/,//g;
 my $refhapfile = $ARGV[3];
 my $refhapline = $ARGV[4];
-my @refhap;
+my $bpmustinclude = $ARGV[5];
+$bpmustinclude =~ s/,//g;
 my $maxmismatch = 3;
 
 open (FILE, "$refhapfile") or die "Cannot open $refhapfile file.\n";
-my ($start, $stop) = (0,0);
-my $head = <FILE>;
-$head =~ s/\s+$//;					# Remove line endings
-my @positions = split("\t", $head);
-shift(@positions);
-for (my $i=0; $i<=$#positions; $i++) {
-	if ($positions[$i+1] > $bpstart) {
-		$start = $i;
-		last;
-	}
-}
-for (my $i=0; $i<=$#positions; $i++) {
-	if ($i == $#positions) {
-		$stop = $i;
-	} elsif ($positions[$i+1] > $bpstop) {
-		$stop = $i;
-		last;
-	}
-}
-
-
-
-my $linecount = 1;
-while ( <FILE> ) {
-	$_ =~ s/\s+$//;					# Remove line endings
-	my @line = split ("\t", $_);	
-	shift(@line);
-	
-	if ($linecount == $refhapline) {
-		for (my $i=0; $i<=$#line; $i++) {
-			if ($i >= $start && $i <= $stop) {
-				push(@refhap, $line[$i]);			
-			}
+	my ($start, $stop, $mustinclude) = 0;
+	my $head = <FILE>;
+	$head =~ s/\s+$//;					# Remove line endings
+	my @positions = split("\t", $head);
+	shift(@positions);
+	for (my $i=0; $i<=$#positions; $i++) {
+		if ($positions[$i+1] > $bpstart) {
+			$start = $i;
+			last;
 		}
 	}
-	$linecount++;
-}
+	for (my $i=0; $i<=$#positions; $i++) {
+		if ($i == $#positions) {
+			$stop = $i;
+		} elsif ($positions[$i+1] > $bpstop) {
+			$stop = $i;
+			last;
+		}
+	}
+
+	my @refhap;
+	my $linecount = 2;
+	while ( <FILE> ) {
+		if ($linecount == $refhapline) {
+			$_ =~ s/\s+$//;					# Remove line endings
+			my @line = split ("\t", $_);	
+			shift(@line);
+		
+			for (my $i=0; $i<=$#line; $i++) {
+				if ($i >= $start && $i <= $stop) {
+					push(@refhap, $line[$i]);			
+				}
+			}
+		}
+		$linecount++;
+	}
 close FILE;
 
 
@@ -69,7 +69,7 @@ close FILE;
 print "subjectid\tMax match\tnSNPs checked\tmaxmatch start\tmaxmatch end\n";
 open (FILE, "$phasedfile") or die "Cannot open $phasedfile file.\n";
 $linecount = 0;
-my ($previnfo, $prevsubjectid, $prev_max) = ((0)x3);
+my ($previnfostring, $prevsubjectid, $prev_max, $prevstart, $prevstop) = ((0)x5);
 <FILE>;
 while ( <FILE> ) {
 	$_ =~ s/\s+$//;					# Remove line endings
@@ -124,16 +124,29 @@ while ( <FILE> ) {
 	}
 	
 	if ($prevsubjectid == $subjectid) {
-		if ($prev_max > $maxlength) {
-			print "$previnfo\n";
-		} else {
+		if ($prev_max > $maxlength && ($prevstart < $bpmustinclude && $prevstop > $bpmustinclude) ) {
+			print "$previnfostring\n";
+		} elsif ($maxmatch_start < $bpmustinclude && $maxmatch_end > $bpmustinclude) {
 			print "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
+		} else {
+			print "*$subjectid\tnomatch\n";
+			print "*$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
+			print "*$previnfostring\n"; 
 		}
 	}
 	
-	# print "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
 	
-	$previnfo = "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end";
+	# DEBUG
+	# print "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end";	
+	# if ($maxmatch_start < $bpmustinclude && $maxmatch_end > $bpmustinclude) {
+	# 	print "*";
+	# }
+	# print "\n";
+	# END DEBUG
+	
+	$previnfostring = "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end";
+	$prevstart = $maxmatch_start;
+	$prevstop = $maxmatch_end;
 	$prevsubjectid = $subjectid;
 	$prev_max = $maxlength;
 }
