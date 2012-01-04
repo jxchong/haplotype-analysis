@@ -54,11 +54,12 @@ open (FILE, "$refhapfile") or die "Cannot open $refhapfile file.\n";
 			my @line = split ("\t", $_);	
 			shift(@line);
 		
-			for (my $i=0; $i<=$#line; $i++) {
-				if ($i >= $start && $i <= $stop) {
-					push(@refhap, $line[$i]);			
-				}
-			}
+			@refhap = @line;
+			# for (my $i=0; $i<=$#line; $i++) {
+				# if ($i >= $start && $i <= $stop) {
+					# push(@refhap, $line[$i]);			
+				# }
+			# }
 		}
 		$linecount++;
 	}
@@ -75,7 +76,7 @@ while ( <FILE> ) {
 	$_ =~ s/\s+$//;					# Remove line endings
 	$linecount++;
 	my @line = split ("\t", $_);
-	my $subjectid = shift(@line);	
+	my $subjectid = shift(@line);
 	my ($maxlength, $maxmatch_start, $maxmatch_end, $nzeros) = ((0)x4);
 	
 	for (my $offset=0; $offset<=$maxmismatch; $offset++) {
@@ -83,52 +84,61 @@ while ( <FILE> ) {
 		$nzeros = 0;
 		my $nmismatch = $offset;
 		for (my $i=0; $i<=$#line; $i++) {
-			if ($i < $start) { next; }
-			if ($i > $stop) {
+			if ($i < $start) { 
+				next;
+			} elsif ($i > $stop) {
 				if ($currlength >= $maxlength) {
 					$maxlength = $currlength;
 					$maxmatch_start = $currmatch_start;
 					$maxmatch_end = $currmatch_end;
 				}
-				last;
-			}
-	 		if ($line[$i] eq $refhap[$i] || $refhap[$i] eq '0') {
-				$currlength += 1;
-				if ($inmatch == 0) {
-					$currmatch_start = $positions[$i];
-				}
-				$currmatch_end = $positions[$i];
-				$inmatch = 1;	
-			} elsif ($line[$i] eq '0') {
-				$nzeros++;
-				if ($inmatch == 1) {
+				next;
+			} else {			
+				if ($line[$i] eq $refhap[$i] || $refhap[$i] eq '0') {
 					$currlength += 1;
-				}
-			} else {
-				if ($nmismatch < $maxmismatch) {
-					$nmismatch += 1;
-					$currlength += 1;
-					next;
-				} else {
-					if ($currlength >= $maxlength) {
-						$maxlength = $currlength;
-						$maxmatch_start = $currmatch_start;
-						$maxmatch_end = $currmatch_end;
+					if ($inmatch == 0) {
+						$currmatch_start = $positions[$i];
 					}
-					$inmatch = 0;
-					$currlength = 0;
-					$nmismatch = $offset;	
+					$currmatch_end = $positions[$i];
+					$inmatch = 1;	
+				} elsif ($line[$i] eq '0') {
+					$nzeros++;
+					if ($inmatch == 1) {
+						$currlength += 1;
+					}
+				} else {
+					if ($nmismatch < $maxmismatch) {
+						$nmismatch += 1;
+						$currlength += 1;
+						next;
+					} else {
+						if ($currlength >= $maxlength) {
+							$maxlength = $currlength;
+							$maxmatch_start = $currmatch_start;
+							$maxmatch_end = $currmatch_end;
+						}
+						$inmatch = 0;
+						$currlength = 0;
+						$nmismatch = 0;	
+					}
 				}
 			}
 		}
 	}
 	
 	if ($prevsubjectid == $subjectid) {
-		if ($prev_max > $maxlength && ($prevstart < $bpmustinclude && $prevstop > $bpmustinclude) ) {
+		my $matchfound = 0;
+		if (($prevstart < $bpmustinclude && $prevstop > $bpmustinclude) ) {  # $prev_max > $maxlength && 
 			print "$previnfostring\n";
-		} elsif ($maxmatch_start < $bpmustinclude && $maxmatch_end > $bpmustinclude) {
+			$matchfound = 1;
+		} if ($maxmatch_start < $bpmustinclude && $maxmatch_end > $bpmustinclude) {
+			if ($matchfound == 1) {
+				print "+";
+			}
 			print "$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
-		} else {
+			$matchfound = 1;
+		} 
+		if ($matchfound == 0) {
 			print "*$subjectid\tnomatch\n";
 			print "*$subjectid\t$maxlength\t".scalar(@refhap)."\t$maxmatch_start\t$maxmatch_end\n";	
 			print "*$previnfostring\n"; 
