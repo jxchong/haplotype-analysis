@@ -11,17 +11,24 @@ use strict;
 use warnings;
 
 
-if (@ARGV != 4) {
-	print "Usage: $0 <phased_file> <refhap_file> <refhap_linenum, starting from top> <pos required to be in match>\n";
+if (@ARGV < 4) {
+	print "Usage: $0 <phased_file> <refhap_file> <refhap_linenum, starting from top> <pos of mutation> <min snps to call match> <mismatches to allow>\n";
 	exit;
 }
+
+
+
+
+
 
 my $phasedfile = $ARGV[0];
 my $refhapfile = $ARGV[1];
 my $refhapline = $ARGV[2];
 my $mutationbp = $ARGV[3];
 $mutationbp =~ s/,//g;
-my $maxmismatch = 3;
+my $minsnpstomatch = $ARGV[4];		# default = 100
+my $maxmismatch = $ARGV[5];			# default = 2
+
 
 
 my $mutationpos_left = 0;
@@ -59,9 +66,9 @@ close FILE;
 
 
 
-print "subjectid\tnSNPschecked\tmatchedSNPs\tmaxmatch_start\tmaxmatch_end\tmatch_lengthbp\n";
+print "subjectid\tnSNPschecked\tnMissing\tmatchedSNPs\tmaxmatch_start\tmaxmatch_end\tmatch_lengthbp\n";
 open (FILE, "$phasedfile") or die "Cannot open $phasedfile file.\n";
-my ($previnfostring, $prevsubjectid, $prev_max) = ((0)x5);
+my ($previnfostring, $prevsubjectid, $prev_max, $prev_nzeros) = ((0)x5);
 my $temp = 1;
 <FILE>;
 while ( <FILE> ) {
@@ -83,7 +90,6 @@ while ( <FILE> ) {
 		my ($nsnps_match, $endmatchpos, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 5);
 		for (my $pos=$mutationpos_left; $pos>=0; $pos--) {
 			if ($refhap[$pos] eq $line[$pos] || $refhap[$pos] eq '0') {
-				# print "at $pos $positions[$pos], match of $refhap[$pos] with $line[$pos]\n";
 				$nsnps_match++;
 				$endmatchpos = $pos;
 			} elsif ($line[$pos] eq '0') {
@@ -92,7 +98,7 @@ while ( <FILE> ) {
 				$endmatchpos = $pos;
 			} else {
 				$nmismatch++;
-				# print "at $pos $positions[$pos], no match of $refhap[$pos] with $line[$pos].   $nsnps_match, $positions[$endmatchpos], $positions[$endmatchpos], $nzeros\n";
+				$nsnps_match++;
 				if ($nmismatch > $m) {
 					last;
 				}
@@ -114,6 +120,7 @@ while ( <FILE> ) {
 				$endmatchpos = $pos;
 			} else {
 				$nmismatch++;
+				$nsnps_match++;
 				if ($nmismatch > $m) {
 					last;
 				}
@@ -147,13 +154,44 @@ while ( <FILE> ) {
 		}			
 	}
 	
+	my $currinfostring = "$subjectid\t".scalar(@refhap)."\t$maxmatch_nzeros\t$maxsnps\t$maxmatch_start\t$maxmatch_end\t$maxlengthbp";
+	
+	if ($prevsubjectid == $subjectid) {
+		# if ($maxsnps == $prev_max && $prev_max > $minsnpstomatch && ($maxmatch_nzeros/$maxsnps) <= 0.05) {
+		# 	print "+=$previnfostring\n";
+		# 	print "+=$currinfostring\n";
+		# } els
+		if (($maxsnps > $minsnpstomatch) && ($prev_max > $minsnpstomatch) && (($maxmatch_nzeros/$maxsnps) <= 0.05) && (($prev_nzeros/$prev_max) <= 0.05)) {
+			print "++$previnfostring\n";
+			print "++$currinfostring\n";
+		} elsif ($prev_max > $maxsnps && $prev_max > $minsnpstomatch) {
+			if ($prev_nzeros/$prev_max <= 0.05) {
+				print "$previnfostring\n";
+			} else {
+				print "?$previnfostring\n";
+			}
+		} elsif ($maxsnps > $prev_max && $maxsnps > $minsnpstomatch) {
+			if ($maxmatch_nzeros/$maxsnps <= 0.05) {
+				print "$currinfostring\n";
+			} else {
+				print "?$currinfostring\n";
+			}
+		} else {
+			print "*$subjectid\tnomatch\n";
+			print "*$previnfostring\n";
+			print "*$currinfostring\n";
+		}
+	}
 
-	print "$subjectid\t".scalar(@refhap)."\t$maxsnps\t$maxmatch_start\t$maxmatch_end\t$maxlengthbp";	
-	print "\n";
+
+	# DEBUG 
+	# print "$subjectid\t".scalar(@refhap)."\t$maxsnps\t$maxmatch_start\t$maxmatch_end\t$maxlengthbp";	
+	# print "\n";
 
 	
-	$previnfostring = "$subjectid\t".scalar(@refhap)."\t$maxsnps\t$maxmatch_start\t$maxmatch_end\t$maxlengthbp";
+	$previnfostring = "$subjectid\t".scalar(@refhap)."\t$maxmatch_nzeros\t$maxsnps\t$maxmatch_start\t$maxmatch_end\t$maxlengthbp";
 	$prevsubjectid = $subjectid;
-	$prev_max = $maxlengthbp;
+	$prev_max = $maxsnps;
+	$prev_nzeros = $maxmatch_nzeros;
 }
 close FILE;
