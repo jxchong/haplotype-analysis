@@ -29,11 +29,27 @@ $mutationbp =~ s/,//g;
 my $minsnpstomatch = $ARGV[4];		# default = 100
 my $maxmismatch = $ARGV[5];			# default = 2
 
-
+my $countanalyzedsubj = 0;
 
 my $mutationpos_left = 0;
 my $mutationpos_right = 0;
 my @refhap;
+
+
+my @genotypedsubj;
+open (FILE, "hutt.1415.findivlist"); 
+while (<FILE>) {
+	$_ =~ s/\s+$//;
+	push(@genotypedsubj, $_);
+}
+close FILE;
+
+
+
+
+
+
+
 
 open (FILE, "$refhapfile") or die "Cannot open $refhapfile file.\n";
 my $head = <FILE>;
@@ -82,12 +98,25 @@ while ( <FILE> ) {
 		die;
 	}
 	
+	if (!grep(/^$subjectid$/, @genotypedsubj)) {
+		next;
+	}
+
+	# DEBUG
+	# if ($subjectid != xxx && $temp!=2) {
+	# 	next;
+	# } else {
+	# 	$temp++;
+	# 	print "$subjectid $mutationpos_left, $mutationpos_right\n";
+	# }
+	
 	my @leftmatches;		 # store:  arrays of (nsnps, end pos of match, lengthbp, nzeros), element # is the number of mismatches
 	my @rightmatches;		 # store:  arrays of (nsnps, end pos of match, lengthbp, nzeros), element # is the number of mismatches
 	
 	# look "before/left of" the mutation
 	for (my $m=0; $m<=$maxmismatch; $m++) {
-		my ($nsnps_match, $endmatchpos, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 5);
+		my ($nsnps_match, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 4);
+		my $endmatchpos = $mutationpos_left;
 		for (my $pos=$mutationpos_left; $pos>=0; $pos--) {
 			if ($refhap[$pos] eq $line[$pos] || $refhap[$pos] eq '0') {
 				$nsnps_match++;
@@ -109,8 +138,10 @@ while ( <FILE> ) {
 
 	# look "after/right of" the mutation
 	for (my $m=0; $m<=$maxmismatch; $m++) {
-		my ($nsnps_match, $endmatchpos, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 5);
+		my ($nsnps_match, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 4);
+		my $endmatchpos = $mutationpos_right;
 		for (my $pos=$mutationpos_right; $pos<=$#refhap; $pos++) {
+			# print "allow $m $pos $endmatchpos\n";		 # DEBUG
 			if ($refhap[$pos] eq $line[$pos] || $refhap[$pos] eq '0') {
 				$nsnps_match++;
 				$endmatchpos = $pos;
@@ -144,7 +175,8 @@ while ( <FILE> ) {
 		} else {
 			$currsnpsmatch = $leftmatch[0]+$rightmatch[0]-1;
 		}
-	
+		print "left: @leftmatch\nright: @rightmatch\n";
+			
 		if ($currsnpsmatch > $maxsnps) {
 			$maxlengthbp = $currlengthbp;
 			$maxsnps = $currsnpsmatch;
@@ -157,6 +189,7 @@ while ( <FILE> ) {
 	my $currinfostring = "$subjectid\t".scalar(@refhap)."\t$maxmatch_nzeros\t$maxsnps\t$maxmatch_start\t$maxmatch_end\t$maxlengthbp";
 	
 	if ($prevsubjectid == $subjectid) {
+		$countanalyzedsubj++;
 		# if ($maxsnps == $prev_max && $prev_max > $minsnpstomatch && ($maxmatch_nzeros/$maxsnps) <= 0.05) {
 		# 	print "+=$previnfostring\n";
 		# 	print "+=$currinfostring\n";
@@ -195,3 +228,5 @@ while ( <FILE> ) {
 	$prev_nzeros = $maxmatch_nzeros;
 }
 close FILE;
+
+print STDERR "Analyzed $countanalyzedsubj subjects with genotype information\n";
