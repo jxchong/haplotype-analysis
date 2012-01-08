@@ -175,7 +175,6 @@ while ( <FILE> ) {
 		} else {
 			$currsnpsmatch = $leftmatch[0]+$rightmatch[0]-1;
 		}
-		print "left: @leftmatch\nright: @rightmatch\n";
 			
 		if ($currsnpsmatch > $maxsnps) {
 			$maxlengthbp = $currlengthbp;
