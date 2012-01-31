@@ -49,10 +49,7 @@ my @badfindivs;
 open (FILE, "MendErr.2012-01-17.findivlist"); 
 while (<FILE>) {
 	$_ =~ s/\s+$//;
-	unless ($_ == 173142 || $_ == 171351) {
-		push(@badfindivs, $_);
-		
-	}
+	push(@badfindivs, $_);
 }
 close FILE;
 
@@ -123,7 +120,7 @@ while ( <FILE> ) {
 			my ($nsnps_match, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 4);
 			my $endmatchpos = $mutationpos_left;
 			for (my $pos=$mutationpos_left; $pos>=0; $pos--) {
-				if (($refhap[$pos] eq $currenthaplotype[$pos] && $refhap[$pos] eq $prevhaplotype[$pos]) || $refhap[$pos] eq '0') {
+				if ($refhap[$pos] eq $currenthaplotype[$pos] || $refhap[$pos] eq $prevhaplotype[$pos] || $refhap[$pos] eq '0') {
 					$nsnps_match++;
 					$endmatchpos = $pos;
 				} elsif ($currenthaplotype[$pos] eq '0' || $prevhaplotype[$pos] eq '0') {
@@ -147,7 +144,7 @@ while ( <FILE> ) {
 			my $endmatchpos = $mutationpos_right;
 			for (my $pos=$mutationpos_right; $pos<=$#refhap; $pos++) {
 				# print "allow $m $pos $endmatchpos\n";		 # DEBUG
-				if (($refhap[$pos] eq $currenthaplotype[$pos] && $refhap[$pos] eq $prevhaplotype[$pos]) || $refhap[$pos] eq '0') {
+				if ($refhap[$pos] eq $currenthaplotype[$pos] || $refhap[$pos] eq $prevhaplotype[$pos] || $refhap[$pos] eq '0') {
 					$nsnps_match++;
 					$endmatchpos = $pos;
 				} elsif ($currenthaplotype[$pos] eq '0' || $prevhaplotype[$pos] eq '0') {

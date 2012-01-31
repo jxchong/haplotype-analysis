@@ -33,7 +33,7 @@ my $countanalyzedsubj = 0;
 
 my $mutationpos_left = 0;
 my $mutationpos_right = 0;
-my @refhap;
+my (@refhap_common, @refhap_rare);
 
 
 my @genotypedsubj;
@@ -49,10 +49,7 @@ my @badfindivs;
 open (FILE, "MendErr.2012-01-17.findivlist"); 
 while (<FILE>) {
 	$_ =~ s/\s+$//;
-	unless ($_ == 173142 || $_ == 171351) {
-		push(@badfindivs, $_);
-		
-	}
+	push(@badfindivs, $_);
 }
 close FILE;
 
@@ -78,13 +75,19 @@ for (my $i=0; $i<=$#positions; $i++) {
 
 my $linecount = 2;
 while ( <FILE> ) {
-	if ($linecount == $refhapline) {
+	if ($linecount == 3) {
 		$_ =~ s/\s+$//;					# Remove line endings
 		my @line = split ("\t", $_);	
 		shift(@line);
-		@refhap = @line;
-		last;
-	}
+		@refhap_common = @line;
+	} elsif ($linecount == 2) {
+		$_ =~ s/\s+$//;					# Remove line endings
+		my @line = split ("\t", $_);	
+		shift(@line);
+		@refhap_rare = @line;
+	} else {
+		next;
+	}	
 	$linecount++;
 }
 close FILE;
@@ -105,9 +108,9 @@ while ( <FILE> ) {
 	my @currenthaplotype = split ("\t", $_);
 	my $subjectid = shift(@currenthaplotype);
 
-	if (scalar(@currenthaplotype) != scalar(@refhap)) {
+	if (scalar(@currenthaplotype) != scalar(@refhap_common)) {
 		print STDERR "Error, refhap and phased haps have different number of SNPs\n";
-		die;
+		exit;
 	}
 	
 	if (!grep(/^$subjectid$/, @genotypedsubj) || (grep(/^$subjectid$/, @badfindivs) && $phasedfile !~ 'SMN')) {
@@ -115,6 +118,21 @@ while ( <FILE> ) {
 	}
 
 	if ($prevsubjectid == $subjectid) {
+			
+		# remove the common haplotype alleles as an option
+		my @remaininghap;
+		for (my $i=0; $i<=$#currenthaplotype; $i++) {
+			if ($refhap_common[$i] eq '0') {
+				push(@remaininghap, $currenthaplotype[$i]);
+			} elsif ($refhap_common[$i] eq $currenthaplotype[$i]) {
+				push(@remaininghap, $prevhaplotype[$i]);
+			} elsif ($refhap_common[$i] eq $prevhaplotype[$i]) {
+				push(@remaininghap, $currenthaplotype[$i]);
+			} else {
+				push(@remaininghap, $currenthaplotype[$i]);
+			}
+		}
+				
 		my @leftmatches;		 # store:  arrays of (nsnps, end snp pos of match, lengthbp, nzeros), element # is the number of mismatches
 		my @rightmatches;		 # store:  arrays of (nsnps, end snp pos of match, lengthbp, nzeros), element # is the number of mismatches
 
@@ -123,10 +141,10 @@ while ( <FILE> ) {
 			my ($nsnps_match, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 4);
 			my $endmatchpos = $mutationpos_left;
 			for (my $pos=$mutationpos_left; $pos>=0; $pos--) {
-				if (($refhap[$pos] eq $currenthaplotype[$pos] && $refhap[$pos] eq $prevhaplotype[$pos]) || $refhap[$pos] eq '0') {
+				if ($refhap_rare[$pos] eq $remaininghap[$pos] || $refhap_rare[$pos] eq '0') {
 					$nsnps_match++;
 					$endmatchpos = $pos;
-				} elsif ($currenthaplotype[$pos] eq '0' || $prevhaplotype[$pos] eq '0') {
+				} elsif ($remaininghap[$pos] eq '0') {
 					$nsnps_match++;
 					$nzeros++;
 					$endmatchpos = $pos;
@@ -145,12 +163,12 @@ while ( <FILE> ) {
 		for (my $m=0; $m<=$maxmismatch; $m++) {
 			my ($nsnps_match, $matchlengthbp, $nzeros, $nmismatch) = ((0) x 4);
 			my $endmatchpos = $mutationpos_right;
-			for (my $pos=$mutationpos_right; $pos<=$#refhap; $pos++) {
+			for (my $pos=$mutationpos_right; $pos<=$#refhap_common; $pos++) {
 				# print "allow $m $pos $endmatchpos\n";		 # DEBUG
-				if (($refhap[$pos] eq $currenthaplotype[$pos] && $refhap[$pos] eq $prevhaplotype[$pos]) || $refhap[$pos] eq '0') {
+				if ($refhap_rare[$pos] eq $remaininghap[$pos] || $refhap_rare[$pos] eq '0') {
 					$nsnps_match++;
 					$endmatchpos = $pos;
-				} elsif ($currenthaplotype[$pos] eq '0' || $prevhaplotype[$pos] eq '0') {
+				} elsif ($remaininghap[$pos] eq '0') {
 					$nsnps_match++;
 					$nzeros++;
 					$endmatchpos = $pos;
@@ -192,7 +210,7 @@ while ( <FILE> ) {
 			}			
 		}
 				
-		my @currinfo = ($subjectid, scalar(@refhap), $maxmatch_nzeros, $maxsnps, $maxmatch_start_snpno, $maxmatch_end_snpno, $maxmatch_start_bp, $maxmatch_end_bp, $maxlengthbp);
+		my @currinfo = ($subjectid, scalar(@refhap_common), $maxmatch_nzeros, $maxsnps, $maxmatch_start_snpno, $maxmatch_end_snpno, $maxmatch_start_bp, $maxmatch_end_bp, $maxlengthbp);
 		
 		$countanalyzedsubj++;
 		if (($maxsnps > $minsnpstomatch) && (($maxmatch_nzeros/$maxsnps) <= 0.05)) {
