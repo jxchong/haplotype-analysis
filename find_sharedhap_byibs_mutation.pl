@@ -45,14 +45,17 @@ while (<FILE>) {
 close FILE;
 
 
+
 my @badfindivs;
 open (FILE, "MendErr.2012-01-17.findivlist"); 
 while (<FILE>) {
 	$_ =~ s/\s+$//;
-	push(@badfindivs, $_);
+	unless ($_ == 173142 || $_ == 171351 || $_ == 173152) {
+		push(@badfindivs, $_);
+		
+	}
 }
 close FILE;
-
 
 
 
@@ -72,6 +75,7 @@ for (my $i=0; $i<=$#positions; $i++) {
 	}
 }
 
+my $mutationpos_gap_bp = $positions[$mutationpos_right] - $positions[$mutationpos_left];
 
 my $linecount = 2;
 while ( <FILE> ) {
@@ -170,7 +174,7 @@ while ( <FILE> ) {
 			my @leftmatch = @{$leftmatches[$l]};		# array of (nsnps, end pos of match, lengthbp, nzeros)
 			my @rightmatch = @{$rightmatches[$r]};	
 
-			my $currlengthbp = $rightmatch[2]-$leftmatch[2];
+			my $currlengthbp = $rightmatch[2]-$leftmatch[2]+$mutationpos_gap_bp;
 			my $currsnpsmatch;
 			if ($mutationpos_left != $mutationpos_right) {
 				$currsnpsmatch = $leftmatch[0]+$rightmatch[0];

@@ -71,6 +71,7 @@ for (my $i=0; $i<=$#positions; $i++) {
 		$mutationpos_left = $mutationpos_right = $i;
 	}
 }
+my $mutationpos_gap_bp = $positions[$mutationpos_right] - $positions[$mutationpos_left];
 
 
 my $linecount = 2;
@@ -191,7 +192,7 @@ while ( <FILE> ) {
 			my @leftmatch = @{$leftmatches[$l]};		# array of (nsnps, end pos of match, lengthbp, nzeros)
 			my @rightmatch = @{$rightmatches[$r]};	
 
-			my $currlengthbp = $rightmatch[2]-$leftmatch[2];
+			my $currlengthbp = $rightmatch[2]-$leftmatch[2]+$mutationpos_gap_bp;
 			my $currsnpsmatch;
 			if ($mutationpos_left != $mutationpos_right) {
 				$currsnpsmatch = $leftmatch[0]+$rightmatch[0];
